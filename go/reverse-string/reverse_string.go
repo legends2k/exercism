@@ -1,13 +1,13 @@
 // Package reverse provides utilies for reversals
 package reverse
 
-// String reverses a given string making two rune array copies
+// String reverses a given string
 func String(s string) string {
 	r := []rune(s)
 	n := len(r)
-	nr := make([]rune, n)
-	for i := 0; i < n; i++ {
-		nr[i] = r[n-i-1]
+	m := n / 2
+	for i := 0; i < m; i++ {
+		r[i], r[n-i-1] = r[n-i-1], r[i]
 	}
-	return string(nr)
+	return string(r)
 }

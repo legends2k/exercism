@@ -12,23 +12,17 @@ func Frequency(s string) FreqMap {
 	return m
 }
 
-// Wrap around sequential counter to communicate return value over a channel.
-// Note the additional qualification for a write-only channel.
-func count(s string, c chan<- FreqMap) {
-	c <- Frequency(s)
-}
-
-// An alternative approach would be to
-// 1. Slice string into NumCPU substrings each of size m runes
-// 2. Make a buffered channel with NumCPU slots
-// 3. Feed each slice to a goroutine and get a resulting map in a slot
-// 3. Total them as each returns back to the main goroutine
+// An alternative approach would be to slice string into NumCPU substrings each
+// of size m runes.
 // ConcurrentFrequency counts each letter’s frequency in a given string slice
 func ConcurrentFrequency(inStr []string) FreqMap {
 	n := len(inStr)
 	c := make(chan FreqMap, n)
 	for i := 0; i < n; i++ {
-		go count(inStr[i], c)
+		// Note the additional qualification for a write-only channel.
+		go func(s string, c chan<- FreqMap) {
+			c <- Frequency(s)
+		}(inStr[i], c)
 	}
 	collated := FreqMap{}
 	for i := 0; i < n; i++ {

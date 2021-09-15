@@ -6,64 +6,68 @@ import (
 )
 
 type CountingReader struct {
-	r io.Reader
-	// Note: pack both byte and op count in one uint64 to use an atomic
-	// instead of a mutex. In some sense, this is cheating since the byte
-	// count itself can be as large as int64.
-	cnt uint64
+	r     io.Reader
+	n     int64
+	nops  int64
+	ready uint32 // atomic flag used for synchronisation
 }
 
 func (cr *CountingReader) Read(p []byte) (n int, err error) {
 	n, err = cr.r.Read(p)
-	comitted := false
-	for !comitted {
-		org_val := atomic.LoadUint64(&cr.cnt)
-		val := org_val
-		val = val + uint64(n)   // lower bits have byte count, simply add!
-		val = val + 0x100000000 // add one to ops
-		comitted = atomic.CompareAndSwapUint64(&cr.cnt, org_val, val)
+	// spin lock
+	for !atomic.CompareAndSwapUint32(&cr.ready, 0, 1) {
 	}
+	cr.n = cr.n + int64(n)
+	cr.nops = cr.nops + 1
+	atomic.StoreUint32(&cr.ready, 0)
 	return
 }
 
+// Important criterion here is that both n and nops should agree
+// i.e. say 20 50-byte reads should give (1000, 20) as result.
+// This rules out making two atomic integer addition, as the
+// operations themselves are atomic but not together
 func (cr *CountingReader) ReadCount() (n int64, nops int) {
-	cnt := atomic.LoadUint64(&cr.cnt)
-	n = int64(cnt & 0xFFFFFFFF)
-	nops = int(cnt >> 32)
+	for !atomic.CompareAndSwapUint32(&cr.ready, 0, 1) {
+	}
+	n = cr.n
+	nops = int(cr.nops)
+	atomic.StoreUint32(&cr.ready, 0)
 	return
 }
 
 func NewReadCounter(r io.Reader) ReadCounter {
-	return &CountingReader{r, 0}
+	return &CountingReader{r, 0, 0, 0}
 }
 
 type CountingWriter struct {
-	r   io.Writer
-	cnt uint64
+	w     io.Writer
+	n     int64
+	nops  int64
+	ready uint32
 }
 
-func (cr *CountingWriter) Write(p []byte) (n int, err error) {
-	n, err = cr.r.Write(p)
-	comitted := false
-	for !comitted {
-		org_val := atomic.LoadUint64(&cr.cnt)
-		val := org_val
-		val = val + uint64(n)   // lower bits have byte count, simply add!
-		val = val + 0x100000000 // add one to ops
-		comitted = atomic.CompareAndSwapUint64(&cr.cnt, org_val, val)
+func (cw *CountingWriter) Write(p []byte) (n int, err error) {
+	n, err = cw.w.Write(p)
+	for !atomic.CompareAndSwapUint32(&cw.ready, 0, 1) {
 	}
+	cw.n = cw.n + int64(n)
+	cw.nops = cw.nops + 1
+	atomic.StoreUint32(&cw.ready, 0)
 	return
 }
 
-func (cr *CountingWriter) WriteCount() (n int64, nops int) {
-	cnt := atomic.LoadUint64(&cr.cnt)
-	n = int64(cnt & 0xFFFFFFFF)
-	nops = int(cnt >> 32)
+func (cw *CountingWriter) WriteCount() (n int64, nops int) {
+	for !atomic.CompareAndSwapUint32(&cw.ready, 0, 1) {
+	}
+	n = cw.n
+	nops = int(cw.nops)
+	atomic.StoreUint32(&cw.ready, 0)
 	return
 }
 
 func NewWriteCounter(r io.Writer) WriteCounter {
-	return &CountingWriter{r, 0}
+	return &CountingWriter{r, 0, 0, 0}
 }
 
 type CountingRW struct {

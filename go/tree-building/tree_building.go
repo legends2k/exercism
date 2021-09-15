@@ -4,6 +4,7 @@ package tree
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type Record struct {
@@ -15,8 +16,8 @@ type Node struct {
 	Children []*Node
 }
 
-func validate(r Record, rec []*Node) error {
-	if r.ID >= len(rec) {
+func validate(r Record, tree []Node) error {
+	if r.ID >= len(tree) {
 		return errors.New("invalid node ID")
 	} else if (r.ID != 0) && (r.ID <= r.Parent) {
 		// if not root, confirm if parent ID < ID
@@ -24,7 +25,7 @@ func validate(r Record, rec []*Node) error {
 	} else if (r.ID == 0) && (r.Parent != 0) {
 		// make sure root has itself as parent
 		return errors.New("invalid root parent")
-	} else if (rec[r.ID] != nil) && (rec[r.ID].ID != -1) {
+	} else if tree[r.ID].ID != -1 {
 		// make sure it’s really absent; placeholder doesn’t count
 		return errors.New("duplicate node")
 	}
@@ -41,44 +42,51 @@ func appendChild(parent *Node, child *Node) {
 	}
 }
 
+func makeTree(n int) []Node {
+	// make an array of n Nodes; set every node’s sID to -1 to denote
+	// uninitialized node, since the default 0 already denotes root
+	tree := make([]Node, n)
+	for i := 0; i < n; i++ {
+		tree[i].ID = -1
+	}
+	return tree
+}
+
 // Build returns the root of the tree compiled from the array of records given
 // as input.  It returns an error if the input is invalid.
 func Build(records []Record) (*Node, error) {
+	n := len(records)
 	// nil tree for nil list
-	if len(records) == 0 {
+	if n == 0 {
 		return nil, nil
 	}
-	n := len(records)
-	var err error
-	// make an array of Node pointers for all records in the input
-	rec := make([]*Node, n)
-	// iterate over records, creating nodes and reporting to the parent
+	// sorting largely improves the BenchmarkShallowTree-8 case; the other two
+	// cases (BenchmarkTwoTree-8, BenchmarkTenTree-8) seem fairly unaffected.
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].ID < records[j].ID
+	})
+	if records[0].ID != 0 {
+		return nil, errors.New("missing root")
+	}
+
+	tree := makeTree(n)
+	// iterate over records, update node ID and report to parent
 	for _, r := range records {
 		// check for invalid and duplicate records
-		err := validate(r, rec)
+		err := validate(r, tree)
 		if err != nil {
 			return nil, err
 		}
-		// if absent, create; if present fix the placeholder
-		if rec[r.ID] == nil {
-			rec[r.ID] = &Node{r.ID, nil}
-		} else {
-			// children already in place; just fix placeholder ID
-			rec[r.ID].ID = r.ID
-		}
+
+		// fix the placeholder -1 with the correct ID
+		tree[r.ID].ID = r.ID
+
 		// report to parent, if not root; root has no parent
 		if r.ID != 0 {
-			// if parent absent, create a placeholder
-			if rec[r.Parent] == nil {
-				rec[r.Parent] = &Node{-1, nil}
-			}
-			appendChild(rec[r.Parent], rec[r.ID])
+			appendChild(&tree[r.Parent], &tree[r.ID])
 		}
 	}
-	if rec[0].ID != 0 {
-		err = errors.New("missing root")
-	}
-	return rec[0], err
+	return &tree[0], nil
 }
 
 func chk(n *Node, m int) (err error) {

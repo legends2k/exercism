@@ -14,6 +14,7 @@ var testVersion = 2
 // Because this is part of the package "erratum", if your solution file
 // is also declared in the package you will automatically have access to
 // these definitions (you do not have to re-declare them).
+
 // TransientError is an error that may occur while opening a resource via
 // ResourceOpener.
 type TransientError struct {
@@ -38,10 +39,12 @@ func (e FrobError) Error() string {
 }
 
 type Resource interface {
+
 	// Resource is using composition to inherit the requirements of the io.Closer
 	// interface. What this means is that a Resource implementation will be
 	// expected to have a .Close() method too.
 	io.Closer
+
 	// Frob does something with the input string.
 	// Because this is an incredibly badly designed system if there is an error
 	// it panics.
@@ -49,6 +52,7 @@ type Resource interface {
 	// The panicked error may be a FrobError in which case Defrob should be
 	// called with the .defrobTag string property of the error.
 	Frob(string)
+
 	Defrob(string)
 }
 
@@ -60,28 +64,26 @@ type ResourceOpener func() (Resource, error)
 
 func Use(o ResourceOpener, input string) (err error) {
 	var res Resource
-	create := 1 // 0 created, 1 create, -1 failure
-	for create == 1 {
+	for {
 		res, err = o()
-		if err == nil {
-			create = 0
-			break
-		} else if _, ok := err.(TransientError); !ok {
-			create = -1
-		}
-	}
-	if create == 0 {
-		defer func() {
-			if r := recover(); r != nil {
-				err = r.(error)
-				fe, ok := err.(FrobError)
-				if ok {
-					res.Defrob(fe.defrobTag)
-				}
+		if err != nil {
+			if _, ok := err.(TransientError); ok {
+				continue
 			}
-			res.Close()
-		}()
-		res.Frob(input)
+			return err
+		}
+		break
 	}
+	defer res.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+			fe, ok := err.(FrobError)
+			if ok {
+				res.Defrob(fe.defrobTag)
+			}
+		}
+	}()
+	res.Frob(input)
 	return err
 }

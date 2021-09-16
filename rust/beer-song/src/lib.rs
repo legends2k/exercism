@@ -22,9 +22,6 @@ pub fn verse(n: u32) -> String {
     String::from("no more")
   };
   let plural1 = if n != 2 { "s" } else { "" };
-  // one, X bottles
-  // one, 1 bottle
-  // it, no more bottles
   let l2 = match n {
     1..=99 => format!(
       "Take {} down and pass it around, {} bottle{} of beer on the wall.\n",
@@ -40,12 +37,9 @@ pub fn verse(n: u32) -> String {
 }
 
 pub fn sing(start: u32, end: u32) -> String {
-  let mut song = String::with_capacity((120 * (start - end)) as usize);
+  let mut v: Vec<String> = Vec::with_capacity((start - end) as usize);
   for x in (end..=start).rev() {
-    let v = verse(x);
-    song.push_str(&v);
-    song.push('\n');
+    v.push(verse(x));
   }
-  song.pop();
-  song
+  return v.join("\n");
 }

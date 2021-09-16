@@ -19,13 +19,14 @@ impl PrimeChecker {
     // NOTE: a generalized PrimeChecker getting non-sequential queries
     // should first check if n is in primes before remainder checking. Also
     // if n < primes.last() then skip remainder checking completely.
-    for factor in self.primes.iter() {
-      // break if we’ve exceeded √n
-      if (factor * factor) > n {
-        break;
-      } else if (n % factor) == 0 {
-        return false;
-      }
+    // take_while stops when predicate is false, while filter doesn’t
+    if self
+      .primes
+      .iter()
+      .take_while(|&p| ((p * p) <= n))
+      .any(|p| (n % p) == 0)
+    {
+      return false;
     }
     self.primes.push(n);
     true
@@ -33,10 +34,12 @@ impl PrimeChecker {
 }
 
 pub fn nth(n: u32) -> u32 {
-  // NOTE: an optimization would be include first few primes in this LUT
+  // NOTE: an optimization would be to include first few primes in this LUT
   let mut checker = PrimeChecker { primes: vec![] };
   (2..)
     .filter(|z| checker.is_prime(*z))
     .nth(n as usize)
     .unwrap()
+  // inspired by https://exercism.io/tracks/rust/exercises/nth-prime/
+  //                     solutions/65a44ef3d18a4e7e9fa85605eecb3fc8
 }

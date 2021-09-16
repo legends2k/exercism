@@ -1,41 +1,57 @@
-struct PrimeChecker {
+struct SeqPrimeChecker {
   primes: Vec<u32>,
 }
 
-impl PrimeChecker {
+// NOTE: This checker wouldn’t work for non-sequential queries
+// e.g. below code won’t work since c.primes would be unpopulated.
+//
+//   let c = PrimeChecker::new();
+//   c.is_prime(34);
+//
+// Populating isn’t an option, since that’d mean having a prime generator inside
+// the checker!
+impl SeqPrimeChecker {
+  fn new() -> Self {
+    SeqPrimeChecker { primes: vec![] }
+  }
+
   fn is_prime(&mut self, n: u32) -> bool {
-    // Integers larger than the square root do not need to be checked
-    // because, whenever n = a × b, one of the two factors a and b ≤ √n or
-    // one of them  needs to be a real number; however for primality we need
-    // both to be integers. So given n, check if any z ∈ [2, ⌊√n⌋] evenly
-    // divides n.
-    // OPTIMIZATIONS
-    // 1. Avoid using the usually expensive `sqrt`
-    // 2. Only check prime numbers in the range
-    // REFERENCES
-    // https://en.wikipedia.org/wiki/Prime_number#Trial_division
-    // https://en.wikipedia.org/wiki/Primality_test
+    // Primality test optimisations employed here follows from two important
+    // observations:
     //
-    // NOTE: a generalized PrimeChecker getting non-sequential queries
-    // should first check if n is in primes before remainder checking. Also
-    // if n < primes.last() then skip remainder checking completely.
-    // take_while stops when predicate is false, while filter doesn’t
+    //   1. Not all numbers from [2, n-1] need to be tested; integers > √n
+    //      needn’t be checked as, when n = a × b, one of the two factors
+    //      a or b ≤ √n; otherwise one needs to be a real number; however for
+    //      primality we need both to be integers.
+    //   2. Only prime divisors need to be checked
+    //
+    // So given n, check if any prime number z ∈ [2, ⌊√n⌋] evenly divides n.
+    // Additionally avoid using sqrt by squaring on both sides.
+    //
+    // REFERENCES
+    //   https://en.wikipedia.org/wiki/Prime_number#Trial_division
+    //   https://en.wikipedia.org/wiki/Primality_test
+    //   https://stackoverflow.com/q/5811151/183120
+    if n <= 1 {
+      return false;
+    }
+    // test clean division with existing primes
     if self
       .primes
-      .iter()
+      .iter() // take_while stops when predicate is false, while filter doesn’t
       .take_while(|&p| ((p * p) <= n))
       .any(|p| (n % p) == 0)
     {
       return false;
     }
+    // none cleanly divided n, store this prime number for future checks
     self.primes.push(n);
     true
   }
 }
 
 pub fn nth(n: u32) -> u32 {
-  // NOTE: an optimization would be to include first few primes in this LUT
-  let mut checker = PrimeChecker { primes: vec![] };
+  let mut checker = SeqPrimeChecker::new();
   (2..)
     .filter(|z| checker.is_prime(*z))
     .nth(n as usize)

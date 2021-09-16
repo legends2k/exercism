@@ -1,30 +1,34 @@
 #[derive(Debug)]
-pub struct HighScores {
-  scores: Vec<u32>,
+pub struct HighScores<'a> {
+  scores: &'a [u32],
 }
 
-impl HighScores {
-  pub fn new(scores: &[u32]) -> Self {
-    HighScores {
-      scores: scores.to_vec(),
-    }
+impl<'a> HighScores<'a> {
+  pub fn new(scores: &'a [u32]) -> Self {
+    HighScores { scores: scores }
   }
 
   pub fn scores(&self) -> &[u32] {
-    &self.scores
+    self.scores
   }
 
   pub fn latest(&self) -> Option<u32> {
+    // Convert Option<&T> to Option<T>:
+    // Rust 1.0.0 introduced .cloned() exactly for this
+    // see https://stackoverflow.com/a/63903840/183120
     self.scores.last().map(|x| *x)
   }
 
   pub fn personal_best(&self) -> Option<u32> {
-    self.scores.iter().max().map(|x| *x)
+    // max().copied() also works here sicne u32 is copyable
+    self.scores.iter().max().cloned()
   }
 
   pub fn personal_top_three(&self) -> Vec<u32> {
-    let mut scores_copy = self.scores.clone();
+    let mut scores_copy = self.scores.to_vec();
     scores_copy.sort_unstable();
-    scores_copy.iter().rev().take(3).map(|&x| x).collect()
+    // copied()/cloned() converts &T to T.  Alternatively,
+    // into_iter().rev().take(3).collect() works too.
+    scores_copy.iter().rev().take(3).copied().collect()
   }
 }

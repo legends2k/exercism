@@ -1,0 +1,27 @@
+# Emacs temporaries
+\#*#
+
+# object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# libraries
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.la
+*.lai
+
+# binaries
+*.out
+*.exe
+
+#macOS
+.DS_Store
+
+#Rust/Cargo
+target/

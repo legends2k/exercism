@@ -1,12 +1,9 @@
-// NOTE
-// 1. encode and decode are inverses of each other
-// 2. add spacing for encode separately as a second step; avoid reseating by
-//    constructing the output in a new string
-
-fn atbash(data: u8) -> u8 {
+// NOTE: atbash cipher’s encode and decode are inverses of each other, so this
+// kernel works for both
+fn atbash(data: char) -> char {
   match data {
-    b'0'..=b'9' => data,
-    _ => b'z' + b'a' - data,
+    '0'..='9' => data,
+    _ => char::from(b'z' + b'a' - data as u8),
   }
 }
 
@@ -23,11 +20,12 @@ pub fn encode(plain: &str) -> String {
       Some(char::from(b' '))
     } else {
       match chars.next() {
-        Some(ch) => Some(char::from(atbash(ch.to_ascii_lowercase()))),
+        Some(ch) => Some(atbash(char::from(ch.to_ascii_lowercase()))),
         None => None,
       }
     }
   });
+  // avoid iter.collect() here to prevent multiple allocations
   let mut cipher = String::with_capacity(plain.len() + plain.len() / 5);
   cipher.extend(iter);
   if cipher.ends_with(" ") {
@@ -41,6 +39,6 @@ pub fn decode(cipher: &str) -> String {
   cipher
     .chars()
     .filter(|c| c.is_ascii_alphanumeric()) // remove spaces
-    .map(|c| char::from(atbash(c as u8)))
+    .map(atbash)
     .collect()
 }

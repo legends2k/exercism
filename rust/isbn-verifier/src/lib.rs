@@ -1,4 +1,6 @@
 /// Determines whether the supplied string is a valid ISBN number
+// Multiply each digit with weights decreasing from 10, sum, check mod 11
+// Examples: 0198526636, 0-19-852663-6, 8-42-261586-X
 pub fn is_valid_isbn(isbn: &str) -> bool {
   let n = isbn.len();
   // ISBN-10 can be 10 chars (no dashes) or 13 chars (3 dashes)
@@ -7,27 +9,22 @@ pub fn is_valid_isbn(isbn: &str) -> bool {
   }
 
   // skip the last character since it might be X
-  let max_idx: usize = n
-    - match isbn.ends_with("X") {
-      true => 2,
-      false => 1,
-    };
+  let (max_idx, base) = match isbn.ends_with("X") {
+    true => (n - 2, 10.0),
+    false => (n - 1, 0.0),
+  };
 
-  let total = &isbn[0..=max_idx]
+  let checksum = &isbn[0..=max_idx]
     .chars()
-    // not doing c.is_numeric() to handle invalid chars ∉ {0..9, -}
-    .filter(|c| *c != '-')
+    // not doing c.is_numeric() to handle invalid chars i.e. ∉ {0..=9, -}
+    .filter(|&c| c != '-')
     .enumerate()
-    .fold(0.0, |acc, (i, c)| {
-      // deter invalid char and strings longer than 10 chars
+    .fold(base, |acc, (i, c)| {
+      // deter invalid char and strings longer than 10 digits
       if i > 9 || c.to_digit(10).is_none() {
         return std::f32::INFINITY;
       }
       acc + ((10.0 - i as f32) * c.to_digit(10).unwrap() as f32)
-    })
-    + match isbn.ends_with("X") {
-      true => 10.0,
-      false => 0.0,
-    };
-  (total % 11.0) == 0.0
+    });
+  (checksum % 11.0) == 0.0
 }
